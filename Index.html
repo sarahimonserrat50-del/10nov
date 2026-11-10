@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Avanzado de Inventario y Reportes - Grupo 502</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f4f8; margin: 0; padding: 15px; color: #333; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .nav-menu { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .nav-menu button { flex: 1; padding: 10px; background: #6c757d; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; min-width: 150px; }
+        .nav-menu button.active { background: #007bff; }
+        .modulo { display: none; background: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #ddd; }
+        .modulo.active { display: block; }
+        input, select, button { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; }
+        button.btn-main { background-color: #28a745; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button.btn-main:hover { background-color: #218838; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 13px; }
+        th { background-color: #007bff; color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>🛍️ Control Integral de Almacén y Reportes - CECyTEC 502</h2>
+
+        <!-- BARRA DE NAVEGACIÓN ENTRE MÓDULOS -->
+        <div class="nav-menu">
+            <button id="btnMod1" class="active" onclick="mostrarModulo('modExistencias')">1. Altas y Existencias</button>
+            <button id="btnMod2" onclick="mostrarModulo('modTransacciones')">2. Compras y Ventas</button>
+            <button id="btnMod3" onclick="mostrarModulo('modReportes')">3. Módulo de Reportes</button>
+        </div>
+
+        <!-- MÓDULO 1: EXISTENCIA Y ALTA DE ARTÍCULOS -->
+        <div id="modExistencias" class="modulo active">
+            <h3>Parte 1: Alta de Artículos y Stock Inicial</h3>
+            <label>Nombre del Artículo:</label>
+            <input type="text" id="artNombre" placeholder="Ej. Cable UTP Cat6">
+            <label>Stock / Existencia Inicial:</label>
+            <input type="number" id="artStock" placeholder="Ej. 50">
+            <button class="btn-main" onclick="darDeAltaArticulo()">Registrar Artículo</button>
+
+            <h4>Catálogo General de Existencias</h4>
+            <table>
+                <thead><tr><th>Artículo</th><th>Stock Actual</th></tr></thead>
+                <tbody id="tablaExistencias"></tbody>
+            </table>
+        </div>
+
+        <!-- MÓDULO 2: COMPRAS Y VENTAS -->
+        <div id="modTransacciones" class="modulo">
+            <h3>Parte 2: Menú de Compras y Ventas</h3>
+            <label>Seleccionar Artículo Existente:</label>
+            <select id="transArticulo"></select>
+            
+            <label>Tipo de Operación:</label>
+            <select id="transTipo">
+                <option value="COMPRA">Compra (Entrada de Stock)</option>
+                <option value="VENTA">Venta (Salida de Stock)</option>
+            </select>
+
+            <label>Cantidad:</label>
+            <input type="number" id="transCantidad" placeholder="Ej. 10">
+
+            <label>Fecha de Operación:</label>
+            <input type="date" id="transFecha">
+
+            <button class="btn-main" onclick="registrarTransaccion()">Procesar Movimiento</button>
+        </div>
+
+        <!-- MÓDULO 3: REPORTES FILTRADOS POR FECHA -->
+        <div id="modReportes" class="modulo">
+            <h3>Parte 3: Reportes y Auditoría Cronológica</h3>
+            <label>Seleccionar Fecha de Consulta:</label>
+            <input type="date" id="filtroFecha" onchange="generarReportes()">
+
+            <h4>📊 Reporte de Existencias en Almacén</h4>
+            <table>
+                <thead><tr><th>Artículo</th><th>Existencia Actual</th></tr></thead>
+                <tbody id="repExistencias"></tbody>
+            </table>
+
+            <h4>🛒 Reporte de Compras por Fecha</h4>
+            <table>
+                <thead><tr><th>Fecha</th><th>Artículo</th><th>Cantidad Comprada</th></tr></thead>
+                <tbody id="repCompras"></tbody>
+            </table>
+
+            <h4>🏷️ Reporte de Ventas por Fecha</h4>
+            <table>
+                <thead><tr><th>Fecha</th><th>Artículo</th><th>Cantidad Vendida</th></tr></thead>
+                <tbody id="repVentas"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            let hoy = new Date().toISOString().split('T')[0];
+            document.getElementById("transFecha").value = hoy;
+            document.getElementById("filtroFecha").value = hoy;
+            renderizarExistencias();
+            cargarComboArticulos();
+        };
+
+        function mostrarModulo(idModulo) {
+            document.querySelectorAll('.modulo').forEach(m => m.classList.remove('active'));
+            document.querySelectorAll('.nav-menu button').forEach(b => b.classList.remove('active'));
+            document.getElementById(idModulo).classList.add('active');
+
+            if(idModulo === 'modExistencias') document.getElementById('btnMod1').classList.add('active');
+            if(idModulo === 'modTransacciones') {
+                document.getElementById('btnMod2').classList.add('active');
+                cargarComboArticulos();
+            }
+            if(idModulo === 'modReportes') {
+                document.getElementById('btnMod3').classList.add('active');
+                generarReportes();
+            }
+        }
+
+        // Almacenamiento Local (LocalStorage)
+        function getArticulos() { return JSON.parse(localStorage.getItem("sis_articulos")) || []; }
+        function setArticulos(data) { localStorage.setItem("sis_articulos", JSON.stringify(data)); }
+        function getCompras() { return JSON.parse(localStorage.getItem("sis_compras")) || []; }
+        function setCompras(data) { localStorage.setItem("sis_compras", JSON.stringify(data)); }
+        function getVentas() { return JSON.parse(localStorage.getItem("sis_ventas")) || []; }
+        function setVentas(data) { localStorage.setItem("sis_ventas", JSON.stringify(data)); }
+
+        // Parte 1: Altas de Artículos
+        function darDeAltaArticulo() {
+            let nombre = document.getElementById("artNombre").value.trim();
+            let stock = parseInt(document.getElementById("artStock").value) || 0;
+            if (nombre === "") return alert("Ingrese el nombre del artículo.");
+
+            let lista = getArticulos();
+            lista.push({ nombre: nombre, stock: stock });
+            setArticulos(lista);
+
+            document.getElementById("artNombre").value = "";
+            document.getElementById("artStock").value = "";
+            renderizarExistencias();
+            alert("¡Artículo dado de alta con éxito!");
+        }
+
+        function renderizarExistencias() {
+            let lista = getArticulos();
+            let tbody = document.getElementById("tablaExistencias");
+            tbody.innerHTML = "";
+            lista.forEach(a => {
+                tbody.innerHTML += `<tr><td>${a.nombre}</td><td><strong>${a.stock}</strong></td></tr>`;
+            });
+        }
+
+        function cargarComboArticulos() {
+            let lista = getArticulos();
+            let combo = document.getElementById("transArticulo");
+            combo.innerHTML = "";
+            lista.forEach((a, i) => {
+                combo.innerHTML += `<option value="${i}">${a.nombre} (Disponible: ${a.stock})</option>`;
+            });
+        }
+
+        // Parte 2: Registro de Compras y Ventas
+        function registrarTransaccion() {
+            let index = document.getElementById("transArticulo").value;
+            let tipo = document.getElementById("transTipo").value;
+            let cant = parseInt(document.getElementById("transCantidad").value) || 0;
+            let fecha = document.getElementById("transFecha").value;
+
+            if (index === "" || cant <= 0 || !fecha) return alert("Complete los datos correctamente.");
+
+            let articulos = getArticulos();
+            let item = articulos[index];
+
+            if (tipo === "VENTA" && cant > item.stock) {
+                return alert("❌ Error: Stock insuficiente para completar la venta.");
+            }
+
+            if (tipo === "COMPRA") {
+                item.stock += cant;
+                let compras = getCompras();
+                compras.push({ fecha: fecha, articulo: item.nombre, cantidad: cant });
+                setCompras(compras);
+            } else {
+                item.stock -= cant;
+                let ventas = getVentas();
+                ventas.push({ fecha: fecha, articulo: item.nombre, cantidad: cant });
+                setVentas(ventas);
+            }
+
+            setArticulos(articulos);
+            document.getElementById("transCantidad").value = "";
+            cargarComboArticulos();
+            alert("¡Transacción procesada con éxito!");
+        }
+
+        // Parte 3: Generación de Reportes Filtrados por Fecha
+        function generarReportes() {
+            let fechaFiltro = document.getElementById("filtroFecha").value;
+
+            // Reporte de Existencias Actuales
+            let articulos = getArticulos();
+            let tbExist = document.getElementById("repExistencias");
+            tbExist.innerHTML = "";
+            articulos.forEach(a => {
+                tbExist.innerHTML += `<tr><td>${a.nombre}</td><td>${a.stock}</td></tr>`;
+            });
+
+            // Reporte de Compras por Fecha
+            let compras = getCompras().filter(c => c.fecha === fechaFiltro);
+            let tbComp = document.getElementById("repCompras");
+            tbComp.innerHTML = compras.length === 0 ? "<tr><td colspan='3'>Sin compras en esta fecha.</td></tr>" : "";
+            compras.forEach(c => {
+                tbComp.innerHTML += `<tr><td>${c.fecha}</td><td>${c.articulo}</td><td>+${c.cantidad}</td></tr>`;
+            });
+
+            // Reporte de Ventas por Fecha
+            let ventas = getVentas().filter(v => v.fecha === fechaFiltro);
+            let tbVent = document.getElementById("repVentas");
+            tbVent.innerHTML = ventas.length === 0 ? "<tr><td colspan='3'>Sin ventas en esta fecha.</td></tr>" : "";
+            ventas.forEach(v => {
+                tbVent.innerHTML += `<tr><td>${v.fecha}</td><td>${v.articulo}</td><td>-${v.cantidad}</td></tr>`;
+            });
+        }
+    </script>
+</body>
+</html>
